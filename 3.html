@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oscillator with Logarithmic Frequency Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        canvas {
+            border: 1px solid black;
+            display: block;
+            margin: 20px auto;
+        }
+
+        #frequencyControl {
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Oscillator and Oscilloscope</h1>
+    
+    <canvas id="oscilloscope" width="600" height="200"></canvas>
+    
+    
+    <button id="startOscillator">Start Oscillator</button>
+    <button id="stopOscillator">Stop Oscillator</button>
+    <br><br>
+    <label for="frequencyControl">Frequency: <span id="frequencyValue">440</span> Hz</label>
+    <input type="range" id="frequencyControl" min="0" max="100" step="1" value="40">
+
+
+    <script>
+        // Создание аудио контекста
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let oscillator;
+        let analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048; // Размер Fast Fourier Transform для анализа
+
+        const canvas = document.getElementById('oscilloscope');
+        const canvasContext = canvas.getContext('2d');
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        const frequencyDisplay = document.getElementById('frequencyValue'); // Элемент для отображения частоты
+
+        // Логарифмическое преобразование: возвращает значение частоты в диапазоне от 20 до 65 000 Гц
+        function getFrequencyFromValue(value) {
+            const minFrequency = 20;    // Минимальная частота
+            const maxFrequency = 65000; // Максимальная частота
+            const minPos = 0;
+            const maxPos = 100;         // Шаги ползунка
+            const minLog = Math.log(minFrequency);
+            const maxLog = Math.log(maxFrequency);
+            const scale = (maxLog - minLog) / (maxPos - minPos);
+
+            return Math.exp(minLog + scale * (value - minPos));
+        }
+
+        // Функция для визуализации осциллографа
+        function drawOscilloscope() {
+            requestAnimationFrame(drawOscilloscope);
+
+            analyser.getByteTimeDomainData(dataArray);
+
+            canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+            canvasContext.beginPath();
+
+            const sliceWidth = canvas.width * 1.0 / bufferLength;
+            let x = 0;
+
+            for (let i = 0; i < bufferLength; i++) {
+                const v = dataArray[i] / 128.0;
+                const y = v * canvas.height / 2;
+
+                if (i === 0) {
+                    canvasContext.moveTo(x, y);
+                } else {
+                    canvasContext.lineTo(x, y);
+                }
+
+                x += sliceWidth;
+            }
+
+            canvasContext.lineTo(canvas.width, canvas.height / 2);
+            canvasContext.strokeStyle = 'rgb(0, 0, 0)';
+            canvasContext.stroke();
+        }
+
+        // Функция для запуска осциллятора
+        document.getElementById('startOscillator').addEventListener('click', () => {
+            oscillator = audioContext.createOscillator();
+            oscillator.type = 'sine'; // Тип осциллятора (sine, square, triangle, sawtooth)
+            oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // Частота 440 Гц (по умолчанию)
+            
+            // Подключаем осциллятор к анализатору и выходу
+            oscillator.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            oscillator.start();
+            
+            drawOscilloscope(); // Запускаем визуализацию
+        });
+
+        // Функция для остановки осциллятора
+        document.getElementById('stopOscillator').addEventListener('click', () => {
+            if (oscillator) {
+                oscillator.stop();
+                oscillator.disconnect();
+            }
+        });
+
+        // Управление частотой с помощью ползунка и отображение значения частоты
+        document.getElementById('frequencyControl').addEventListener('input', function() {
+            const frequency = getFrequencyFromValue(this.value);
+            frequencyDisplay.textContent = Math.round(frequency); // Обновляем отображение частоты в Hz
+            if (oscillator) {
+                oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime); // Изменяем частоту в реальном времени
+            }
+        });
+    </script>
+</body>
+</html>
