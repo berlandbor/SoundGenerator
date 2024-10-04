@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Синтезатор барабанов</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .controls {
+            display: inline-block;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Синтезатор барабанов</h1>
+
+    <div class="controls">
+        <button id="kickButton">Бочка</button>
+        <button id="snareButton">Снейр</button>
+        <button id="hihatButton">Хай-хэт</button>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Функция для создания бочки (Kick Drum)
+        function playKick() {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = 'sine'; // Используем синусоидальную волну
+            oscillator.frequency.setValueAtTime(150, audioCtx.currentTime); // Начальная частота
+            oscillator.frequency.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5); // Быстрое затухание частоты
+
+            gainNode.gain.setValueAtTime(1, audioCtx.currentTime); // Стартовая громкость
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5); // Затухание громкости
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.5); // Останавливаем через 0.5 секунд
+        }
+
+        // Функция для создания снейра (Snare Drum)
+        function playSnare() {
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.2, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseBuffer.length; i++) {
+                output[i] = Math.random() * 2 - 1; // Генерация белого шума
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(1, audioCtx.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2); // Быстрое затухание
+
+            noise.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+
+            noise.start();
+            noise.stop(audioCtx.currentTime + 0.2); // Шум продолжается 0.2 секунд
+
+            // Добавляем низкочастотный синус для "удара"
+            const oscillator = audioCtx.createOscillator();
+            oscillator.type = 'triangle'; // Используем треугольную волну для удара
+            oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+
+            const oscGain = audioCtx.createGain();
+            oscGain.gain.setValueAtTime(0.7, audioCtx.currentTime);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); // Быстрое затухание
+
+            oscillator.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.1); // Останавливаем через 0.1 секунд
+        }
+
+        // Функция для создания хай-хэта (Hi-Hat)
+        function playHiHat() {
+            const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.05, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseBuffer.length; i++) {
+                output[i] = Math.random() * 2 - 1; // Генерация белого шума
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.7, audioCtx.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05); // Очень быстрое затухание
+
+            noise.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+
+            noise.start();
+            noise.stop(audioCtx.currentTime + 0.05); // Хай-хэт продолжается 0.05 секунд
+        }
+
+        // Привязываем события к кнопкам
+        document.getElementById('kickButton').addEventListener('click', playKick);
+        document.getElementById('snareButton').addEventListener('click', playSnare);
+        document.getElementById('hihatButton').addEventListener('click', playHiHat);
+    </script>
+</body>
+</html>
