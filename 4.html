@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Синтезатор с модуляцией и осциллографом</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .controls {
+            display: inline-block;
+            text-align: left;
+            margin-top: 20px;
+        }
+
+        .controls div {
+            margin: 10px 0;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+        }
+
+        canvas {
+            margin-top: 20px;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Синтезатор с модуляцией и осциллографом</h1>
+
+    <div class="controls">
+        <div>
+            <label for="waveform">Форма волны:</label>
+            <select id="waveform">
+                <option value="sine">Синус</option>
+                <option value="square">Квадрат</option>
+                <option value="sawtooth">Пилообразная</option>
+                <option value="triangle">Треугольник</option>
+            </select>
+        </div>
+        
+        <div>
+            <label for="frequency">Частота носителя (Hz):</label>
+            <input type="range" id="frequency" min="50" max="1000" value="440">
+            <span id="frequencyValue">440</span> Hz
+        </div>
+        
+        <div>
+            <label for="modFrequency">Частота модулятора (Hz):</label>
+            <input type="range" id="modFrequency" min="0" max="100" value="5">
+            <span id="modFrequencyValue">5</span> Hz
+        </div>
+        
+        <div>
+            <label for="modDepth">Глубина модуляции:</label>
+            <input type="range" id="modDepth" min="0" max="1000" value="50">
+            <span id="modDepthValue">50</span>
+        </div>
+        
+        <div>
+            <button id="startButton">Включить</button>
+            <button id="stopButton" disabled>Выключить</button>
+        </div>
+    </div>
+
+    <!-- Элемент Canvas для осциллографа -->
+    <canvas id="oscilloscope" width="300" height="200"></canvas>
+
+    <script>
+        // Инициализация аудио-контекста
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let carrierOscillator, modulatorOscillator, gainNode, modulatorGain, analyser;
+        let isPlaying = false;
+
+        // Получаем элементы управления
+        const waveformSelect = document.getElementById('waveform');
+        const frequencySlider = document.getElementById('frequency');
+        const frequencyValue = document.getElementById('frequencyValue');
+        const modFrequencySlider = document.getElementById('modFrequency');
+        const modFrequencyValue = document.getElementById('modFrequencyValue');
+        const modDepthSlider = document.getElementById('modDepth');
+        const modDepthValue = document.getElementById('modDepthValue');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const oscilloscopeCanvas = document.getElementById('oscilloscope');
+        const canvasCtx = oscilloscopeCanvas.getContext('2d');
+
+        // Обновляем значения в реальном времени
+        frequencySlider.addEventListener('input', () => {
+            frequencyValue.textContent = frequencySlider.value;
+            if (carrierOscillator) {
+                carrierOscillator.frequency.setValueAtTime(frequencySlider.value, audioCtx.currentTime);
+            }
+        });
+
+        modFrequencySlider.addEventListener('input', () => {
+            modFrequencyValue.textContent = modFrequencySlider.value;
+            if (modulatorOscillator) {
+                modulatorOscillator.frequency.setValueAtTime(modFrequencySlider.value, audioCtx.currentTime);
+            }
+        });
+
+        modDepthSlider.addEventListener('input', () => {
+            modDepthValue.textContent = modDepthSlider.value;
+            if (modulatorGain) {
+                modulatorGain.gain.setValueAtTime(modDepthSlider.value, audioCtx.currentTime);
+            }
+        });
+
+        // Функция для запуска осцилляторов и анализатора
+        function startOscillators() {
+            carrierOscillator = audioCtx.createOscillator(); // Носитель
+            modulatorOscillator = audioCtx.createOscillator(); // Модулятор
+            modulatorGain = audioCtx.createGain(); // Узел управления амплитудой модулятора
+            gainNode = audioCtx.createGain(); // Узел громкости для носителя
+
+            // Настройка осцилляторов
+            carrierOscillator.type = waveformSelect.value;
+            carrierOscillator.frequency.setValueAtTime(frequencySlider.value, audioCtx.currentTime);
+
+            modulatorOscillator.frequency.setValueAtTime(modFrequencySlider.value, audioCtx.currentTime);
+            modulatorGain.gain.setValueAtTime(modDepthSlider.value, audioCtx.currentTime);
+
+            // Модулятор управляет частотой носителя
+            modulatorOscillator.connect(modulatorGain);
+            modulatorGain.connect(carrierOscillator.frequency);
+
+            // Создание анализатора для осциллографа
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 2048;
+            const bufferLength = analyser.fftSize;
+            const dataArray = new Uint8Array(bufferLength);
+
+            // Подключение осциллятора носителя к выходу через анализатор
+            carrierOscillator.connect(gainNode);
+            gainNode.connect(analyser);
+            analyser.connect(audioCtx.destination);
+
+            // Функция для рисования осциллографа
+            function drawOscilloscope() {
+                requestAnimationFrame(drawOscilloscope);
+
+                analyser.getByteTimeDomainData(dataArray);
+
+                canvasCtx.fillStyle = 'rgb(200, 200, 200)';
+                canvasCtx.fillRect(0, 0, oscilloscopeCanvas.width, oscilloscopeCanvas.height);
+
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeStyle = 'rgb(0, 0, 0)';
+                canvasCtx.beginPath();
+
+                const sliceWidth = oscilloscopeCanvas.width * 1.0 / bufferLength;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = v * oscilloscopeCanvas.height / 2;
+
+                    if (i === 0) {
+                        canvasCtx.moveTo(x, y);
+                    } else {
+                        canvasCtx.lineTo(x, y);
+                    }
+
+                    x += sliceWidth;
+                }
+
+                canvasCtx.lineTo(oscilloscopeCanvas.width, oscilloscopeCanvas.height / 2);
+                canvasCtx.stroke();
+            }
+
+            // Запуск осциллографа
+            drawOscilloscope();
+
+            // Запуск осцилляторов
+            carrierOscillator.start();
+            modulatorOscillator.start();
+
+            // Обновление кнопок
+            startButton.disabled = true;
+            stopButton.disabled = false;
+        }
+
+        // Функция для остановки осцилляторов
+        function stopOscillators() {
+            carrierOscillator.stop();
+            modulatorOscillator.stop();
+
+            // Обновление кнопок
+            startButton.disabled = false;
+            stopButton.disabled = true;
+        }
+
+        // Привязка событий к кнопкам
+        startButton.addEventListener('click', () => {
+            if (!isPlaying) {
+                startOscillators();
+                isPlaying = true;
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            if (isPlaying) {
+                stopOscillators();
+                isPlaying = false;
+            }
+        });
+    </script>
+</body>
+</html>
