@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Электронное пианино</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .piano {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            width: 600px;
+            margin: 0 auto;
+        }
+
+        .key {
+            width: 50px;
+            height: 200px;
+            margin: 2px;
+            background-color: white;
+            border: 1px solid black;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+
+        .key.black {
+            width: 30px;
+            height: 120px;
+            background-color: black;
+            position: relative;
+            z-index: 1;
+            margin-left: -15px;
+            margin-right: -15px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <h1>Электронное пианино</h1>
+
+    <div class="piano">
+        <div class="key" data-note="C4">C</div>
+        <div class="key black" data-note="C#4"></div>
+        <div class="key" data-note="D4">D</div>
+        <div class="key black" data-note="D#4"></div>
+        <div class="key" data-note="E4">E</div>
+        <div class="key" data-note="F4">F</div>
+        <div class="key black" data-note="F#4"></div>
+        <div class="key" data-note="G4">G</div>
+        <div class="key black" data-note="G#4"></div>
+        <div class="key" data-note="A4">A</div>
+        <div class="key black" data-note="A#4"></div>
+        <div class="key" data-note="B4">B</div>
+        <div class="key" data-note="C5">C</div>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Частоты нот (Гц)
+        const notes = {
+            'C4': 261.63,
+            'C#4': 277.18,
+            'D4': 293.66,
+            'D#4': 311.13,
+            'E4': 329.63,
+            'F4': 349.23,
+            'F#4': 369.99,
+            'G4': 392.00,
+            'G#4': 415.30,
+            'A4': 440.00,
+            'A#4': 466.16,
+            'B4': 493.88,
+            'C5': 523.25
+        };
+
+        // Функция для синтеза звука электронного пианино
+        function playNote(frequency) {
+            const oscillator1 = audioCtx.createOscillator();
+            const oscillator2 = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            // Основная волна
+            oscillator1.type = 'sine'; // Синусоидальная волна для мягкого звучания
+            oscillator1.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            // Дополнительная волна для более насыщенного звука
+            oscillator2.type = 'triangle'; // Треугольная волна добавляет характерный электронный тембр
+            oscillator2.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            // Затухание звука
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime); // Начальная громкость
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5); // Затухание за 1.5 секунд
+
+            // Подключаем осцилляторы к узлу громкости
+            oscillator1.connect(gainNode);
+            oscillator2.connect(gainNode);
+
+            // Подключаем узел громкости к выходу
+            gainNode.connect(audioCtx.destination);
+
+            // Запуск осцилляторов
+            oscillator1.start();
+            oscillator2.start();
+
+            // Остановка осцилляторов через 1.5 секунд
+            oscillator1.stop(audioCtx.currentTime + 1.5);
+            oscillator2.stop(audioCtx.currentTime + 1.5);
+        }
+
+        // Добавляем событие на каждую клавишу
+        document.querySelectorAll('.key').forEach(key => {
+            key.addEventListener('mousedown', () => {
+                const note = key.getAttribute('data-note');
+                const frequency = notes[note];
+                playNote(frequency);
+            });
+        });
+    </script>
+</body>
+</html>
